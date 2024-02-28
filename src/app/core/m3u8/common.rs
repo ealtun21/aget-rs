@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Read};
 
+use flate2::bufread::GzDecoder;
 use m3u8_rs::{parse_playlist_res, Key, Playlist};
 
 use crate::common::{
@@ -25,6 +26,11 @@ pub struct M3u8Segment {
 pub type M3u8SegmentList = Vec<M3u8Segment>;
 
 pub type SharedM3u8SegmentList = SharedVec<M3u8Segment>;
+
+// Function to check if the content is GZIP-compressed
+fn is_gzipped(data: &[u8]) -> bool {
+    data.starts_with(&[0x1f, 0x8b])
+}
 
 pub async fn get_m3u8(
     client: &HttpClient,
@@ -54,7 +60,18 @@ pub async fn get_m3u8(
         // Read m3u8 content
         let resp = request(client, method.clone(), u.clone(), data.clone(), None).await?;
         let cn = resp.bytes().await?;
-        let mut cn = cn.to_vec();
+
+        // Attempt to decompress if data is GZIP-compressed
+        let mut cn = if is_gzipped(&cn) {
+            let mut gz = GzDecoder::new(&cn[..]);
+            let mut decompressed_content = Vec::new();
+            match gz.read_to_end(&mut decompressed_content) {
+                Ok(_) => decompressed_content, // Use the decompressed content
+                Err(_) => cn.to_vec(),         // In case of an error, fallback to original content
+            }
+        } else {
+            cn.to_vec()
+        };
 
         // Adding "\n" for the case when response content has not "\n" at end.
         cn.extend(b"\n");

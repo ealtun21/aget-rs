@@ -54,6 +54,7 @@ dirs = "5.0"
 
 # for m3u8
 m3u8-rs = "5"
+flate2 = "1.0.28"
 
 # for tracing
 tracing = "0.1"
